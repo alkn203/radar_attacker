@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+ 
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, user-scalable=no" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+ 
+        <title>Radar Attacker</title>
+        <meta name="description" content="tmlib.js 用公式エディタ. 色々と使えますよ♪" />
+
+        <style>body {
+    background-color: rgb(240, 240, 250);
+}
+
+h1 {
+    color: #444;
+    font-size: 23px;
+    font-family: 'Lucida Grande','Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+}</style>
+
+        <script src="https://cdn.rawgit.com/phi-jp/tmlib.js/0.5.0/build/tmlib.js"></script>
+		<script>// アセット
+var ASSETS = {
+    "bg" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/bg01.png",
+    "ship" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/ship.png",
+    "bomb" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/bomb.png",
+};
+// 初期化
+tm.game.setup({
+    title: "Radar Attacker",
+});
+// 定数
+var MAX_PER_LINE     = 8; // マスの並び最大数
+var SQUARE_NUM       = MAX_PER_LINE * MAX_PER_LINE; // マスの数
+var SQUARE_ALL_WIDTH = SCREEN_GRID_X.span(15);    // マスの全体の幅
+var SQUARE_MARGIN    = 0;
+var SQUARE_SIZE      = (SQUARE_ALL_WIDTH - (SQUARE_MARGIN * MAX_PER_LINE)) / MAX_PER_LINE;  // マスのサイズ
+var SQUARE_OFFSET_X  = (SCREEN_WIDTH - SQUARE_ALL_WIDTH) / 2 + (SQUARE_SIZE + SQUARE_MARGIN) / 2;   // マスのオフセットX
+var SQUARE_OFFSET_Y  = (SCREEN_HEIGHT - SQUARE_ALL_WIDTH) / 2 + (SQUARE_SIZE + SQUARE_MARGIN) / 2;  // マスのオフセットY
+var SQUARE_FILL      = "transparent"; // マスの塗りつぶし色
+var SQUARE_STROKE    = "silver"; // マスの枠色
+var BOMB_MAX         = 24; // 使える爆弾の数
+var BOMB_PER_LINE    = BOMB_MAX / 2; // 爆弾の並び最大数
+var BOMB_ALL_WIDTH   = SCREEN_GRID_X.span(14);    // 爆弾の全体の幅
+var BOMB_MARGIN      = 4; // 爆弾のマージン
+var BOMB_SIZE        = (BOMB_ALL_WIDTH - (BOMB_MARGIN * BOMB_PER_LINE)) / BOMB_PER_LINE;  // 爆弾のサイズ
+var BOMB_OFFSET_X    = (SCREEN_WIDTH - BOMB_ALL_WIDTH) / 2 + (BOMB_SIZE + BOMB_MARGIN) / 2;   // 爆弾のオフセットX
+var BOMB_OFFSET_Y    = SCREEN_GRID_Y.span(1.5); // 爆弾のオフセットY
+var SHIP_PART_SIZE   = SQUARE_SIZE; // シップのパーツのサイズ
+// シップの組み立て情報
+var SHIP_ARRAY       = [[[0, 0], [1, 0]],
+                        [[0, 0], [1, 0], [2, 0]],
+                        [[0, 0], [1, 0], [2, 0], [3, 0]]];
+var CLEAR_CNT        = 9; // クリアに必要なヒット数
+
+var crossCvs = null;
+var expCvs = null;
+
+// ゲームシーン
+tm.define("GameScene", {
+    // 親クラスを指定
+    superClass: "Scene",
+    // 初期化
+    init: function() {
+        // 親クラスの初期化
+        this.superInit();
+        
+        crossCvs = Shape({
+            width: SQUARE_SIZE,
+            height: SQUARE_SIZE,
+        }).canvas;
+        expCvs = CircleShape({
+            width: SQUARE_SIZE,
+            height: SQUARE_SIZE,
+        }).canvas;
+        // 背景画像
+        var backShape = Sprite("bg").addChildTo(this);
+        backShape.origin.set(0, 0);
+        backShape.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+        // シップグループ
+        var shipGroup = CanvasElement().addChildTo(backShape);
+        var repshipGroup = CanvasElement().addChildTo(this);
+        // マスグループ
+        var squareGroup = CanvasElement().addChildTo(backShape);
+                // フレーム
+        var frame = RoundRectangleShape({
+            width: SQUARE_ALL_WIDTH + 10,
+            height: SQUARE_ALL_WIDTH + 10,
+            fillStyle: SQUARE_FILL,
+            strokeStyle: SQUARE_STROKE,
+            lineWidth: 8,
+        }).addChildTo(backShape).setPosition(SCREEN_CENTER_X, SCREEN_CENTER_Y);
+        // 爆弾グループ
+        var bombGroup = CanvasElement().addChildTo(this);
+        // マスのグリッドシステム
+        var squareGrid = GridSystem(SQUARE_ALL_WIDTH, MAX_PER_LINE);
+        // 爆弾のグリッドシステム
+        var bombGrid = GridSystem(BOMB_ALL_WIDTH, BOMB_PER_LINE);
+        var self = this;
+        // マスを生成
+        (SQUARE_NUM).times(function(i) {
+            // インデックス位置設定
+            var xIndex = i % MAX_PER_LINE;
+            var yIndex = (i / MAX_PER_LINE).floor();
+            // マス作成
+            var square = Square().addChildTo(squareGroup);
+            // 位置設定
+            square.x = squareGrid.span(xIndex) + SQUARE_OFFSET_X;
+            square.y = squareGrid.span(yIndex) + SQUARE_OFFSET_Y;
+            // タッチ時
+            square.onpointingstart = function() {
+                // 残り爆弾を減らす
+                var last = self.bombs.last;
+                last.tweener.clear().fadeOut(200).call(function(){
+                    last.remove();
+                });
+                // タッチ無効に
+                square.setInteractive(false);
+                // ヒット判定
+                self.checkHit(square);
+            };
+        });
+        // 残り爆弾を配置
+        (BOMB_MAX).times(function(i) {
+            // インデックス位置設定
+            var xIndex = i % BOMB_PER_LINE;
+            var yIndex = (i / BOMB_PER_LINE).floor();
+            // 爆弾作成
+            var bomb = Bomb().addChildTo(bombGroup);
+            // 位置設定
+            bomb.x = bombGrid.span(xIndex) + BOMB_OFFSET_X;
+            bomb.y = bombGrid.span(yIndex) + BOMB_OFFSET_Y;
+        });
+        // 参照用
+        this.backShape = backShape;
+        this.squares = squareGroup.children;
+        this.shipGroup = shipGroup;
+        this.ships = shipGroup.children;
+        this.repshipGroup = repshipGroup;
+        this.repships = repshipGroup.children;
+        this.bombGroup = bombGroup;
+        this.bombs = bombGroup.children;
+        this.squareGrid = squareGrid;
+        // シップ配置
+        this.initShips();
+        this.setShipVisible(true);
+    },
+    // シップをランダムに配置
+    initShips: function() {
+        var self = this;
+        
+        (SHIP_ARRAY.length).times(function(index) {
+            self.createShip(self.shipGroup, index, self.getRandomLoc());
+        });
+        // 無効な配置であればやり直し
+        if (this.isInValidLocation()) {
+            this.ships.clear();
+            this.initShips();
+        }
+    },
+    // シップ作成
+    createShip: function(group, index, param) {
+        var tmps = CanvasElement();
+        var sLen = index + 2;
+        var fIndex = null;
+        // パーツタイプ毎に作成
+        (sLen).times(function(i) {
+            if (i === 0) {
+                fIndex = 0;
+            }
+            else {
+                if (i === sLen - 1) {
+                    fIndex = 2;                
+                }
+                else {
+                    fIndex = 1;
+                }
+            }
+            var part = ShipPart(fIndex).addChildTo(tmps);                
+            part.sLen = sLen;
+        });
+        // 原点パーツ
+        var org = tmps.children.first;
+        org.setPosition(param.x, param.y);
+        // 組み立て配置
+        tmps.children.each(function(tmp, i) {
+            tmp.x = org.x + SHIP_ARRAY[index][i][0] * SHIP_PART_SIZE;
+            tmp.y = org.y + SHIP_ARRAY[index][i][1] * SHIP_PART_SIZE;
+        });
+        // 回転
+        this.rotateShip(tmps, param.rot);
+        // グループに追加
+        (tmps.children.length).times(function(tmp) {
+            tmps.children.pop().addChildTo(group);
+        });
+    },
+    // 90度単位でシップを回転
+    rotateShip: function(ship, rot) {
+        var org = ship.children.first;
+
+        (rot).times(function(i) {
+            ship.children.each(function(elem){
+                var tmpX = elem.x;
+                var tmpY = elem.y;
+                var ad = tmpX - org.x;
+                var bd = tmpY - org.y;
+            
+                elem.x = - bd + org.x;
+                elem.y = ad + org.y;
+                elem.rotation = rot * 90;
+            });
+        });
+    },
+    // ランダムな位置・角度を返す
+    getRandomLoc: function() {
+        var loc = Array.range(MAX_PER_LINE);
+        var rx = this.squareGrid.span(loc.random()) + SQUARE_OFFSET_X;
+        var ry = this.squareGrid.span(loc.random()) + SQUARE_OFFSET_Y;
+        var r = Array.range(4).random();
+        var param = {x: rx, y: ry, rot: r};
+        return param;
+    },
+    // 初期配置のチェック
+    isInValidLocation: function() {
+        var self = this;
+        var isBad = false;
+        // 左上と右下のマス
+        var lt = this.squares.first;
+        var rb = this.squares.last;
+        // はみ出しチェック
+        this.ships.each(function(part) {
+            if (part.x < lt.x || part.x > rb.x || part.y < lt.y || part.y > rb.y) {
+                isBad = true;
+            }    
+        });
+        // 重なりチェック
+        var cnt = 0;
+        this.ships.each(function(part) {
+            self.ships.each(function(target) {
+                if (part.x === target.x && part.y === target.y) {
+                    cnt++;
+                }
+            });
+        });
+        console.log(cnt);
+        // 自己重複分より多い場合
+        if (cnt > CLEAR_CNT) {
+            isBad = true;
+        }
+        // はみ出しや重なりがある場合
+        return isBad ? true : false;
+    },
+    // シップとの当たり判定
+    checkHit: function(square) {
+        var self = this;
+        var hit = false;
+        // ヒットチェック
+        this.ships.each(function(part) {
+            if (square.x === part.x && square.y === part.y) {
+                // ヒットフラグを立てる
+                Explosion().addChildTo(square);        
+                part.isHit = true;
+                hit = true;
+                // 画面をシェイクする
+                var shakeW = SQUARE_SIZE / 10;
+                self.backShape.tweener.clear()
+                                      .by({x: -shakeW}, 100)
+                                      .by({x: shakeW}, 50)
+                                      .by({x: shakeW}, 50)
+                                      .by({x: -shakeW}, 100);
+                // シップの撃沈チェック
+                (SHIP_ARRAY.length).times(function(index) {
+                    self.destroyShip(index);
+                });                
+            }
+        });
+        // 外れならマーク表示
+        if (!hit) {
+            Cross().addChildTo(square);
+        }
+        // 弾切れならシップ位置表示
+        if (this.bombs.length === 0) {
+            this.setShipVisible(true);
+            this.exit("title");
+        }
+    },
+    // 指定されたシップの撃沈チェック
+    destroyShip: function(index) {
+        var self = this;
+        var cnt = 0;
+        var sLen = index + 2;
+        // ヒット数をカウント
+        this.ships.each(function(part) {
+            if (part.sLen === sLen && part.isHit) {
+                cnt++;
+            }
+        });
+        // 全てヒットだったらレプリカに爆発表示
+        if (cnt === sLen) {
+
+        }
+
+        var dCnt = 0;
+        this.ships.each(function(part) {
+            if (part.isHit) {
+                dCnt++;
+            }
+        });
+        // シップ全撃破でクリア
+        if (dCnt === CLEAR_CNT) {
+            this.clear();
+        }
+    },
+    // クリア
+    clear: function() {
+        this.exit("result", {
+            score: this.bombs.length * 100,
+        });
+    },
+    // シップの表示切替え
+    setShipVisible: function(b) {
+        var alpha = b ? 1.0 : 0.0;
+        this.ships.each(function(part) {
+            part.setAlpha(alpha);
+        });
+    },
+});
+// マスクラス
+tm.define("Square", {
+    // 親クラスを指定
+    superClass: "RectangleShape",
+    // 初期化
+    init: function() {
+        // 親クラスの初期化
+        this.superInit({
+            width: SQUARE_SIZE,
+            height: SQUARE_SIZE,
+            fillStyle: SQUARE_FILL,
+            strokeStyle: SQUARE_STROKE,
+            alpha: 0.5,
+        });
+        // タッチを有効に
+        this.setInteractive(true);
+    },
+});
+// シップパーツクラス
+tm.define("ShipPart", {
+    // 親クラスを指定
+    superClass: "Sprite",
+    // 初期化
+    init: function(fIndex) {
+        // 親クラスの初期化
+        this.superInit("ship", 40, 40);
+        this.setFrameIndex(fIndex).setSize(SHIP_PART_SIZE, SHIP_PART_SIZE);
+        this.isHit = false;
+    },
+});
+// 爆弾クラス
+tm.define("Bomb", {
+    // 親クラスを指定
+    superClass: "Sprite",
+    // 初期化
+    init: function() {
+        // 親クラスの初期化
+        this.superInit("bomb");
+        this.setSize(BOMB_SIZE, BOMB_SIZE);
+    },
+});
+// はずれマーク
+tm.define("Cross", {
+    // 親クラスを指定
+    superClass: "Sprite",
+    // 初期化
+    init: function() {
+        // 親クラスの初期化
+        this.superInit(crossCvs);
+        Label("X").addChildTo(this);
+    },
+});
+// 爆発クラス
+tm.define("Explosion", {
+    // 親クラスを指定
+    superClass: "Sprite",
+    // 初期化
+    init: function() {
+        // 親クラスの初期化
+        this.superInit(expCvs);
+    },
+});</script>
+    </head>
+    <body>
+        <canvas id="world"></canvas>
+    </body>
+</html>
