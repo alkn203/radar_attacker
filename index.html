@@ -19,12 +19,14 @@ h1 {
     font-family: 'Lucida Grande','Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
 }</style>
 
-        <script src="https://cdn.rawgit.com/phi-jp/tmlib.js/0.5.0/build/tmlib.js"></script>
+        <script src="http://cdn.rawgit.com/phi-jp/tmlib.js/0.5.0/build/tmlib.js"></script>
 		<script>// アセット
 var ASSETS = {
     "bg" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/bg01.png",
     "ship" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/ship.png",
     "bomb" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/bomb.png",
+    "cross" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/cross.png",
+    "explosion" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/explosion.png",
 };
 // 初期化
 tm.game.setup({
@@ -53,10 +55,6 @@ var SHIP_ARRAY       = [[[0, 0], [1, 0]],
                         [[0, 0], [1, 0], [2, 0]],
                         [[0, 0], [1, 0], [2, 0], [3, 0]]];
 var CLEAR_CNT        = 9; // クリアに必要なヒット数
-
-var crossCvs = null;
-var expCvs = null;
-
 // ゲームシーン
 tm.define("GameScene", {
     // 親クラスを指定
@@ -65,15 +63,6 @@ tm.define("GameScene", {
     init: function() {
         // 親クラスの初期化
         this.superInit();
-        
-        crossCvs = Shape({
-            width: SQUARE_SIZE,
-            height: SQUARE_SIZE,
-        }).canvas;
-        expCvs = CircleShape({
-            width: SQUARE_SIZE,
-            height: SQUARE_SIZE,
-        }).canvas;
         // 背景画像
         var backShape = Sprite("bg").addChildTo(this);
         backShape.origin.set(0, 0);
@@ -92,7 +81,7 @@ tm.define("GameScene", {
             lineWidth: 8,
         }).addChildTo(backShape).setPosition(SCREEN_CENTER_X, SCREEN_CENTER_Y);
         // 爆弾グループ
-        var bombGroup = CanvasElement().addChildTo(this);
+        var bombGroup = CanvasElement().addChildTo(backShape);
         // マスのグリッドシステム
         var squareGrid = GridSystem(SQUARE_ALL_WIDTH, MAX_PER_LINE);
         // 爆弾のグリッドシステム
@@ -111,10 +100,7 @@ tm.define("GameScene", {
             // タッチ時
             square.onpointingstart = function() {
                 // 残り爆弾を減らす
-                var last = self.bombs.last;
-                last.tweener.clear().fadeOut(200).call(function(){
-                    last.remove();
-                });
+                var lost = self.bombs.pop();
                 // タッチ無効に
                 square.setInteractive(false);
                 // ヒット判定
@@ -198,7 +184,6 @@ tm.define("GameScene", {
     // 90度単位でシップを回転
     rotateShip: function(ship, rot) {
         var org = ship.children.first;
-
         (rot).times(function(i) {
             ship.children.each(function(elem){
                 var tmpX = elem.x;
@@ -259,7 +244,7 @@ tm.define("GameScene", {
         this.ships.each(function(part) {
             if (square.x === part.x && square.y === part.y) {
                 // ヒットフラグを立てる
-                Explosion().addChildTo(square);        
+                Explosion().addChildTo(self.backShape).setPosition(square.x, square.y);
                 part.isHit = true;
                 hit = true;
                 // 画面をシェイクする
@@ -277,7 +262,7 @@ tm.define("GameScene", {
         });
         // 外れならマーク表示
         if (!hit) {
-            Cross().addChildTo(square);
+            Cross().addChildTo(self.backShape).setPosition(square.x, square.y);
         }
         // 弾切れならシップ位置表示
         if (this.bombs.length === 0) {
@@ -298,9 +283,7 @@ tm.define("GameScene", {
         });
         // 全てヒットだったらレプリカに爆発表示
         if (cnt === sLen) {
-
         }
-
         var dCnt = 0;
         this.ships.each(function(part) {
             if (part.isHit) {
@@ -338,7 +321,7 @@ tm.define("Square", {
             height: SQUARE_SIZE,
             fillStyle: SQUARE_FILL,
             strokeStyle: SQUARE_STROKE,
-            alpha: 0.5,
+            alpha: 0.6,
         });
         // タッチを有効に
         this.setInteractive(true);
@@ -374,8 +357,8 @@ tm.define("Cross", {
     // 初期化
     init: function() {
         // 親クラスの初期化
-        this.superInit(crossCvs);
-        Label("X").addChildTo(this);
+        this.superInit("cross");
+        this.setSize(SQUARE_SIZE, SQUARE_SIZE);
     },
 });
 // 爆発クラス
@@ -385,11 +368,18 @@ tm.define("Explosion", {
     // 初期化
     init: function() {
         // 親クラスの初期化
-        this.superInit(expCvs);
+        this.superInit("explosion", 80, 80);
+        this.setFrameIndex(0);
+    },
+    // フレームアニメーション
+    update: function() {
+        if (this.frameIndex < 7) {
+            this.frameIndex++;
+        }
     },
 });</script>
     </head>
     <body>
-        <canvas id="world"></canvas>
+        <canvas id='world'></canvas>
     </body>
 </html>
