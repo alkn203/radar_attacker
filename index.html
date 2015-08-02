@@ -67,6 +67,10 @@ tm.define("GameScene", {
         var backShape = Sprite("bg").addChildTo(this);
         backShape.origin.set(0, 0);
         backShape.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+        // 爆弾ラベル
+        var bombLabel = Label("BOMB").addChildTo(backShape);
+        bombLabel.setPosition(SCREEN_GRID_X.span(2.6), SCREEN_GRID_Y.span(0.6));
+        bombLabel.setFontSize(BOMB_SIZE).setFillStyle("lime").setAlpha(0.8);
         // シップグループ
         var shipGroup = CanvasElement().addChildTo(backShape);
         var repshipGroup = CanvasElement().addChildTo(this);
@@ -118,6 +122,13 @@ tm.define("GameScene", {
             bomb.x = bombGrid.span(xIndex) + BOMB_OFFSET_X;
             bomb.y = bombGrid.span(yIndex) + BOMB_OFFSET_Y;
         });
+        // 敵ラベル
+        var enemyLabel = Label("ENEMY").addChildTo(backShape);
+        enemyLabel.setPosition(SCREEN_GRID_X.span(2.9), SCREEN_GRID_Y.span(-2.4));
+        enemyLabel.setFontSize(BOMB_SIZE).setFillStyle("fuchsia").setAlpha(0.8);
+        
+        var enemy = Sprite("ship").addChildTo(this);
+        enemy.setPosition(SCREEN_GRID_X.span(2.9), SCREEN_GRID_Y.span(-1.4));
         // 参照用
         this.backShape = backShape;
         this.squares = squareGroup.children;
