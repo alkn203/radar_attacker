@@ -73,10 +73,10 @@ tm.define("GameScene", {
         bombLabel.setFontSize(BOMB_SIZE).setFillStyle("lime").setAlpha(0.8);
         // シップグループ
         var shipGroup = CanvasElement().addChildTo(backShape);
-        var repshipGroup = CanvasElement().addChildTo(this);
+        var repshipGroup = CanvasElement().addChildTo(backShape);
         // マスグループ
         var squareGroup = CanvasElement().addChildTo(backShape);
-                // フレーム
+        // フレーム
         var frame = RoundRectangleShape({
             width: SQUARE_ALL_WIDTH + 10,
             height: SQUARE_ALL_WIDTH + 10,
@@ -90,6 +90,8 @@ tm.define("GameScene", {
         var squareGrid = GridSystem(SQUARE_ALL_WIDTH, MAX_PER_LINE);
         // 爆弾のグリッドシステム
         var bombGrid = GridSystem(BOMB_ALL_WIDTH, BOMB_PER_LINE);
+        // レプリカシップのグリッドシステム
+        var repGrid = GridSystem(SQUARE_ALL_WIDTH, 3);
         var self = this;
         // マスを生成
         (SQUARE_NUM).times(function(i) {
@@ -126,9 +128,19 @@ tm.define("GameScene", {
         var enemyLabel = Label("ENEMY").addChildTo(backShape);
         enemyLabel.setPosition(SCREEN_GRID_X.span(2.9), SCREEN_GRID_Y.span(-2.4));
         enemyLabel.setFontSize(BOMB_SIZE).setFillStyle("fuchsia").setAlpha(0.8);
-        
-        var enemy = Sprite("ship").addChildTo(this);
-        enemy.setPosition(SCREEN_GRID_X.span(2.9), SCREEN_GRID_Y.span(-1.4));
+        // レプリカシップを作成
+        (3).times(function(i) {
+            // インデックス位置設定
+            var xIndex = i % 3;
+            var yIndex = (i / 3).floor();
+            // レプリカ作成
+            var repship = Sprite("ship").addChildTo(repshipGroup);
+            repship.setScale(1.2);
+            repship.isBroken = false;
+            // 位置設定
+            repship.x = repGrid.span(xIndex) + enemyLabel.x;
+            repship.y = repGrid.span(yIndex) + enemyLabel.bottom + 30;
+        });
         // 参照用
         this.backShape = backShape;
         this.squares = squareGroup.children;
@@ -294,6 +306,14 @@ tm.define("GameScene", {
         });
         // 全てヒットだったらレプリカに爆発表示
         if (cnt === sLen) {
+            var bCnt = 0;
+            this.repships.each(function(ship) {
+                if (!ship.isBroken && bCnt === 0) {
+                    ship.isBroken = true;
+                    Explosion().addChildTo(ship);
+                    bCnt = 1;
+                }    
+            });
         }
         var dCnt = 0;
         this.ships.each(function(part) {
