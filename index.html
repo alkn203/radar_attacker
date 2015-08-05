@@ -48,7 +48,7 @@ var BOMB_ALL_WIDTH   = SCREEN_GRID_X.span(14);    // 爆弾の全体の幅
 var BOMB_MARGIN      = 4; // 爆弾のマージン
 var BOMB_SIZE        = (BOMB_ALL_WIDTH - (BOMB_MARGIN * BOMB_PER_LINE)) / BOMB_PER_LINE;  // 爆弾のサイズ
 var BOMB_OFFSET_X    = (SCREEN_WIDTH - BOMB_ALL_WIDTH) / 2 + (BOMB_SIZE + BOMB_MARGIN) / 2;   // 爆弾のオフセットX
-var BOMB_OFFSET_Y    = SCREEN_GRID_Y.span(1.5); // 爆弾のオフセットY
+var BOMB_OFFSET_Y    = SCREEN_GRID_Y.span(1.2); // 爆弾のオフセットY
 var SHIP_PART_SIZE   = SQUARE_SIZE; // シップのパーツのサイズ
 // シップの組み立て情報
 var SHIP_ARRAY       = [[[0, 0], [1, 0]],
@@ -67,10 +67,6 @@ tm.define("GameScene", {
         var backShape = Sprite("bg").addChildTo(this);
         backShape.origin.set(0, 0);
         backShape.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
-        // 爆弾ラベル
-        var bombLabel = Label("BOMB").addChildTo(backShape);
-        bombLabel.setPosition(SCREEN_GRID_X.span(2.6), SCREEN_GRID_Y.span(0.6));
-        bombLabel.setFontSize(BOMB_SIZE).setFillStyle("lime").setAlpha(0.8);
         // シップグループ
         var shipGroup = CanvasElement().addChildTo(backShape);
         var repshipGroup = CanvasElement().addChildTo(backShape);
@@ -124,10 +120,6 @@ tm.define("GameScene", {
             bomb.x = bombGrid.span(xIndex) + BOMB_OFFSET_X;
             bomb.y = bombGrid.span(yIndex) + BOMB_OFFSET_Y;
         });
-        // 敵ラベル
-        var enemyLabel = Label("ENEMY").addChildTo(backShape);
-        enemyLabel.setPosition(SCREEN_GRID_X.span(2.9), SCREEN_GRID_Y.span(-2.4));
-        enemyLabel.setFontSize(BOMB_SIZE).setFillStyle("fuchsia").setAlpha(0.8);
         // レプリカシップを作成
         (3).times(function(i) {
             // インデックス位置設定
@@ -137,10 +129,15 @@ tm.define("GameScene", {
             var repship = Sprite("ship").addChildTo(repshipGroup);
             repship.setScale(1.2);
             repship.isBroken = false;
+            repship.len = i + 2;
             // 位置設定
-            repship.x = repGrid.span(xIndex) + enemyLabel.x;
-            repship.y = repGrid.span(yIndex) + enemyLabel.bottom + 30;
+            repship.x = repGrid.span(xIndex) + SCREEN_GRID_X.span(2.9);
+            repship.y = repGrid.span(yIndex) + SCREEN_GRID_Y.span(-1.4);
         });
+        // メッセージ
+        this.msgText = TextShape({text: "YOU LOST"}).addChildTo(this);
+        this.msgText.left = SCREEN_WIDTH;
+        this.msgText.y = SCREEN_CENTER_Y;
         // 参照用
         this.backShape = backShape;
         this.squares = squareGroup.children;
@@ -153,7 +150,7 @@ tm.define("GameScene", {
         this.squareGrid = squareGrid;
         // シップ配置
         this.initShips();
-        this.setShipVisible(true);
+        this.setShipVisible(false);
     },
     // シップをランダムに配置
     initShips: function() {
@@ -251,7 +248,6 @@ tm.define("GameScene", {
                 }
             });
         });
-        console.log(cnt);
         // 自己重複分より多い場合
         if (cnt > CLEAR_CNT) {
             isBad = true;
@@ -287,10 +283,9 @@ tm.define("GameScene", {
         if (!hit) {
             Cross().addChildTo(self.backShape).setPosition(square.x, square.y);
         }
-        // 弾切れならシップ位置表示
+        // 弾切れならゲームオーバー
         if (this.bombs.length === 0) {
-            this.setShipVisible(true);
-            this.exit("title");
+            this.gameover();
         }
     },
     // 指定されたシップの撃沈チェック
@@ -306,12 +301,10 @@ tm.define("GameScene", {
         });
         // 全てヒットだったらレプリカに爆発表示
         if (cnt === sLen) {
-            var bCnt = 0;
             this.repships.each(function(ship) {
-                if (!ship.isBroken && bCnt === 0) {
+                if (!ship.isBroken && ship.len === sLen) {
                     ship.isBroken = true;
                     Explosion().addChildTo(ship);
-                    bCnt = 1;
                 }    
             });
         }
@@ -326,17 +319,48 @@ tm.define("GameScene", {
             this.clear();
         }
     },
+    // ゲームオーバー
+    gameover: function() {
+        var self = this;
+        this.setSquereDisable();
+        // シップ位置表示
+        this.setShipVisible(true);
+        // メッセージ表示
+        this.msgText.right = 0;
+        this.msgText.tweener.clear()
+                            .wait(1000)
+                            .to({x: SCREEN_CENTER_X}, 1000, "easeOutBounce")
+                            .wait(1000)
+                            .call(function(){
+                                self.exit("title");
+                            });
+    },
     // クリア
     clear: function() {
-        this.exit("result", {
-            score: this.bombs.length * 100,
-        });
+        var self = this;
+        this.setSquereDisable();
+        this.msgText.text = "YOU WON";
+        this.msgText.tweener.clear()
+                            .wait(200)
+                            .to({x: SCREEN_CENTER_X}, 1000, "easeOutBounce")
+                            .wait(1000)
+                            .call(function(){
+                                self.exit("result", {
+                                    score: self.bombs.length * 100,
+                                });
+                            });
     },
     // シップの表示切替え
     setShipVisible: function(b) {
         var alpha = b ? 1.0 : 0.0;
         this.ships.each(function(part) {
             part.setAlpha(alpha);
+        });
+    },
+    // マスをタッチ不可にする
+    setSquereDisable: function() {
+        this.squares.each(function(square) {
+            square.setInteractive(false);
         });
     },
 });
