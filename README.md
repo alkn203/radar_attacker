@@ -1,5 +1,6 @@
 # Radar Attacker
 A BattleShip-like game made in tmlib.js
+
 海戦ゲーム風 tmlib.js製
 
 本プログラムで使用している画像について
