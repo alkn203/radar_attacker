@@ -135,7 +135,7 @@ tm.define("GameScene", {
             repship.y = repGrid.span(yIndex) + SCREEN_GRID_Y.span(-1.4);
         });
         // メッセージ
-        this.msgText = TextShape({text: "YOU LOST"}).addChildTo(this);
+        this.msgText = TextShape({text: "YOU LOSE"}).addChildTo(this);
         this.msgText.left = SCREEN_WIDTH;
         this.msgText.y = SCREEN_CENTER_Y;
         // 参照用
@@ -264,6 +264,7 @@ tm.define("GameScene", {
             if (square.x === part.x && square.y === part.y) {
                 // ヒットフラグを立てる
                 Explosion().addChildTo(self.backShape).setPosition(square.x, square.y);
+                tm.asset.Manager.get("se_hit").clone().play();
                 part.isHit = true;
                 hit = true;
                 // 画面をシェイクする
@@ -304,7 +305,7 @@ tm.define("GameScene", {
             this.repships.each(function(ship) {
                 if (!ship.isBroken && ship.len === sLen) {
                     ship.isBroken = true;
-                    Explosion().addChildTo(ship);
+                    Explosion().addChildTo(ship).setScale(1.2);
                 }    
             });
         }
@@ -327,6 +328,7 @@ tm.define("GameScene", {
         this.setShipVisible(true);
         // メッセージ表示
         this.msgText.right = 0;
+        this.msgText.fillStyle = "red";
         this.msgText.tweener.clear()
                             .wait(1000)
                             .to({x: SCREEN_CENTER_X}, 1000, "easeOutBounce")
@@ -339,7 +341,8 @@ tm.define("GameScene", {
     clear: function() {
         var self = this;
         this.setSquereDisable();
-        this.msgText.text = "YOU WON";
+        this.msgText.text = "YOU WIN";
+        this.msgText.fillStyle = "lime";
         this.msgText.tweener.clear()
                             .wait(200)
                             .to({x: SCREEN_CENTER_X}, 1000, "easeOutBounce")
