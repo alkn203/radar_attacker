@@ -27,6 +27,19 @@ var ASSETS = {
     "bomb" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/bomb.png",
     "cross" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/cross.png",
     "explosion" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/explosion.png",
+    "se_hit" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/se_hit.mp3",
+};
+
+tm.game.TitleScene.default = {
+    title: "Time is money",
+    message: "",
+    fontSize: 72,
+    fontColor: "lime",
+    width: 640,
+    height: 960,
+    bgColor: "rgb(240,240,240)",
+    bgImage: "bg",
+    autopop: true,
 };
 // 初期化
 tm.game.setup({
@@ -81,13 +94,17 @@ tm.define("GameScene", {
             lineWidth: 8,
         }).addChildTo(backShape).setPosition(SCREEN_CENTER_X, SCREEN_CENTER_Y);
         // 爆弾グループ
-        var bombGroup = CanvasElement().addChildTo(backShape);
+        this.bombGroup = CanvasElement().addChildTo(backShape);
+        // 爆発グループ
+        this.explosionGroup = CanvasElement().addChildTo(backShape);
+        // はずれマークグループ
+        this.crossGroup = CanvasElement().addChildTo(backShape);
         // マスのグリッドシステム
         var squareGrid = GridSystem(SQUARE_ALL_WIDTH, MAX_PER_LINE);
         // 爆弾のグリッドシステム
-        var bombGrid = GridSystem(BOMB_ALL_WIDTH, BOMB_PER_LINE);
+        this.bombGrid = GridSystem(BOMB_ALL_WIDTH, BOMB_PER_LINE);
         // レプリカシップのグリッドシステム
-        var repGrid = GridSystem(SQUARE_ALL_WIDTH, 3);
+        this.repGrid = GridSystem(SQUARE_ALL_WIDTH, 3);
         var self = this;
         // マスを生成
         (SQUARE_NUM).times(function(i) {
@@ -109,33 +126,12 @@ tm.define("GameScene", {
                 self.checkHit(square);
             };
         });
-        // 残り爆弾を配置
-        (BOMB_MAX).times(function(i) {
-            // インデックス位置設定
-            var xIndex = i % BOMB_PER_LINE;
-            var yIndex = (i / BOMB_PER_LINE).floor();
-            // 爆弾作成
-            var bomb = Bomb().addChildTo(bombGroup);
-            // 位置設定
-            bomb.x = bombGrid.span(xIndex) + BOMB_OFFSET_X;
-            bomb.y = bombGrid.span(yIndex) + BOMB_OFFSET_Y;
-        });
-        // レプリカシップを作成
-        (3).times(function(i) {
-            // インデックス位置設定
-            var xIndex = i % 3;
-            var yIndex = (i / 3).floor();
-            // レプリカ作成
-            var repship = Sprite("ship").addChildTo(repshipGroup);
-            repship.setScale(1.2);
-            repship.isBroken = false;
-            repship.len = i + 2;
-            // 位置設定
-            repship.x = repGrid.span(xIndex) + SCREEN_GRID_X.span(2.9);
-            repship.y = repGrid.span(yIndex) + SCREEN_GRID_Y.span(-1.4);
-        });
         // メッセージ
-        this.msgText = TextShape({text: "YOU LOSE"}).addChildTo(this);
+        this.msgText = TextShape({
+            text: "ROUND 10",
+            fillStyle: "lime",
+            strokeStyle: "green",
+        }).addChildTo(this);
         this.msgText.left = SCREEN_WIDTH;
         this.msgText.y = SCREEN_CENTER_Y;
         // 参照用
@@ -145,12 +141,36 @@ tm.define("GameScene", {
         this.ships = shipGroup.children;
         this.repshipGroup = repshipGroup;
         this.repships = repshipGroup.children;
-        this.bombGroup = bombGroup;
-        this.bombs = bombGroup.children;
+        this.bombs = this.bombGroup.children;
         this.squareGrid = squareGrid;
+        // 何ゲーム目か
+        this.round = 0;
+        // 一旦タッチ不可に
+        this.setSquereEnable(false);
         // シップ配置
+        this.initGame();
+    },
+    // 配置初期化
+    initGame: function() {
         this.initShips();
         this.setShipVisible(false);
+        this.initBombs();
+        this.initRepShip();
+        this.explosionGroup.removeChildren();
+        this.crossGroup.removeChildren();
+        this.round++;
+        
+        var self = this;
+        // 流れテキスト
+        this.msgText.text = "ROUND {0}".format(this.round); 
+        this.msgText.left = SCREEN_WIDTH;
+        this.msgText.tweener.clear()
+                            .to({x: SCREEN_CENTER_X}, 500, "easeOutCubic")
+                            .wait(200)
+                            .to({right: 0}, 500, "easeInCubic")
+                            .call(function(){
+                                self.setSquereEnable(true);     
+                            });
     },
     // シップをランダムに配置
     initShips: function() {
@@ -255,6 +275,41 @@ tm.define("GameScene", {
         // はみ出しや重なりがある場合
         return isBad ? true : false;
     },
+    // 爆弾配置初期化
+    initBombs: function() {
+        this.bombs.clear();
+        var self = this;
+        // 残り爆弾を配置
+        (BOMB_MAX).times(function(i) {
+            // インデックス位置設定
+            var xIndex = i % BOMB_PER_LINE;
+            var yIndex = (i / BOMB_PER_LINE).floor();
+            // 爆弾作成
+            var bomb = Bomb().addChildTo(self.bombGroup);
+            // 位置設定
+            bomb.x = self.bombGrid.span(xIndex) + BOMB_OFFSET_X;
+            bomb.y = self.bombGrid.span(yIndex) + BOMB_OFFSET_Y;
+        });
+    },
+    // レプリカシップ配置初期化
+    initRepShip: function() {
+        this.repships.clear();
+        var self = this;
+        
+       (3).times(function(i) {
+            // インデックス位置設定
+            var xIndex = i % 3;
+            var yIndex = (i / 3).floor();
+            // レプリカ作成
+            var repship = Sprite("ship").addChildTo(self.repshipGroup);
+            repship.setScale(1.2);
+            repship.isBroken = false;
+            repship.len = i + 2;
+            // 位置設定
+            repship.x = self.repGrid.span(xIndex) + SCREEN_GRID_X.span(2.9);
+            repship.y = self.repGrid.span(yIndex) + SCREEN_GRID_Y.span(-1.4);
+        });
+    },
     // シップとの当たり判定
     checkHit: function(square) {
         var self = this;
@@ -263,7 +318,8 @@ tm.define("GameScene", {
         this.ships.each(function(part) {
             if (square.x === part.x && square.y === part.y) {
                 // ヒットフラグを立てる
-                Explosion().addChildTo(self.backShape).setPosition(square.x, square.y);
+                var explosion = Explosion().addChildTo(self.explosionGroup);
+                explosion.setPosition(square.x, square.y);
                 tm.asset.Manager.get("se_hit").clone().play();
                 part.isHit = true;
                 hit = true;
@@ -282,11 +338,12 @@ tm.define("GameScene", {
         });
         // 外れならマーク表示
         if (!hit) {
-            Cross().addChildTo(self.backShape).setPosition(square.x, square.y);
+            var cross = Cross().addChildTo(this.crossGroup);
+            cross.setPosition(square.x, square.y);
         }
-        // 弾切れならゲームオーバー
+        // 弾切れなら負け
         if (this.bombs.length === 0) {
-            this.gameover();
+            this.lose();
         }
     },
     // 指定されたシップの撃沈チェック
@@ -320,37 +377,28 @@ tm.define("GameScene", {
             this.clear();
         }
     },
-    // ゲームオーバー
-    gameover: function() {
+    // 負け
+    lose: function() {
         var self = this;
-        this.setSquereDisable();
+        this.setSquereEnable(false);
         // シップ位置表示
         this.setShipVisible(true);
-        // メッセージ表示
-        this.msgText.right = 0;
-        this.msgText.fillStyle = "red";
-        this.msgText.tweener.clear()
-                            .wait(1000)
-                            .to({x: SCREEN_CENTER_X}, 1000, "easeOutBounce")
-                            .wait(1000)
-                            .call(function(){
-                                self.exit("title");
-                            });
+        this.tweener.clear()
+                    .wait(4000)
+                    .call(function(){
+                        self.initGame(); 
+                    });
     },
-    // クリア
-    clear: function() {
+    // 勝ち
+    win: function() {
         var self = this;
         this.setSquereDisable();
-        this.msgText.text = "YOU WIN";
-        this.msgText.fillStyle = "lime";
         this.msgText.tweener.clear()
                             .wait(200)
                             .to({x: SCREEN_CENTER_X}, 1000, "easeOutBounce")
                             .wait(1000)
                             .call(function(){
-                                self.exit("result", {
-                                    score: self.bombs.length * 100,
-                                });
+                                self.exit("title"); 
                             });
     },
     // シップの表示切替え
@@ -360,10 +408,10 @@ tm.define("GameScene", {
             part.setAlpha(alpha);
         });
     },
-    // マスをタッチ不可にする
-    setSquereDisable: function() {
+    // マスのタッチ設定
+    setSquereEnable: function(b) {
         this.squares.each(function(square) {
-            square.setInteractive(false);
+            square.setInteractive(b);
         });
     },
 });
