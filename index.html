@@ -153,7 +153,7 @@ tm.define("GameScene", {
     // 配置初期化
     initGame: function() {
         this.initShips();
-        this.setShipVisible(false);
+//        this.setShipVisible(false);
         this.initBombs();
         this.initRepShip();
         this.explosionGroup.removeChildren();
@@ -470,18 +470,25 @@ tm.define("Cross", {
 // 爆発クラス
 tm.define("Explosion", {
     // 親クラスを指定
-    superClass: "Sprite",
+    superClass: "AnimationSprite",
     // 初期化
     init: function() {
+        // スプライトシート作成
+        var ss = SpriteSheet({
+            image: "explosion",
+            frame: {
+                width: 80,
+                height: 80,
+                count: 8
+            },
+            animations: {
+                "start": [0, 7, "end", 2],
+                "end": [5, 7, "end", 10],
+            }
+        });
         // 親クラスの初期化
-        this.superInit("explosion", 80, 80);
-        this.setFrameIndex(0);
-    },
-    // フレームアニメーション
-    update: function() {
-        if (this.frameIndex < 7) {
-            this.frameIndex++;
-        }
+        this.superInit(ss, SQUARE_SIZE, SQUARE_SIZE);
+        this.gotoAndPlay("start");
     },
 });</script>
     </head>
