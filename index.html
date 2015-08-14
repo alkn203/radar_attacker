@@ -22,6 +22,7 @@ h1 {
         <script src="http://cdn.rawgit.com/phi-jp/tmlib.js/0.5.0/build/tmlib.js"></script>
 		<script>// アセット
 var ASSETS = {
+    "bg_title" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/bg00.png",
     "bg" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/bg01.png",
     "ship" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/ship.png",
     "bomb" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/bomb.png",
@@ -29,21 +30,12 @@ var ASSETS = {
     "explosion" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/explosion.png",
     "se_hit" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/se_hit.mp3",
 };
-
-tm.game.TitleScene.default = {
-    title: "Time is money",
-    message: "",
-    fontSize: 72,
-    fontColor: "lime",
-    width: 640,
-    height: 960,
-    bgColor: "rgb(240,240,240)",
-    bgImage: "bg",
-    autopop: true,
-};
+// デフォルトパラメータ書き換え
+tm.game.TitleScene.default.bgImage = "bg_title";
+tm.game.TitleScene.default.fontColor = "lime";
 // 初期化
 tm.game.setup({
-    title: "Radar Attacker",
+    title: "Radar Touch",
 });
 // 定数
 var MAX_PER_LINE     = 8; // マスの並び最大数
@@ -68,6 +60,7 @@ var SHIP_ARRAY       = [[[0, 0], [1, 0]],
                         [[0, 0], [1, 0], [2, 0]],
                         [[0, 0], [1, 0], [2, 0], [3, 0]]];
 var CLEAR_CNT        = 9; // クリアに必要なヒット数
+var ROUND_MAX        = 1; // ラウンド数
 // ゲームシーン
 tm.define("GameScene", {
     // 親クラスを指定
@@ -81,10 +74,10 @@ tm.define("GameScene", {
         backShape.origin.set(0, 0);
         backShape.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
         // シップグループ
-        var shipGroup = CanvasElement().addChildTo(backShape);
-        var repshipGroup = CanvasElement().addChildTo(backShape);
+        this.shipGroup = CanvasElement().addChildTo(backShape);
+        this.repshipGroup = CanvasElement().addChildTo(backShape);
         // マスグループ
-        var squareGroup = CanvasElement().addChildTo(backShape);
+        this.squareGroup = CanvasElement().addChildTo(backShape);
         // フレーム
         var frame = RoundRectangleShape({
             width: SQUARE_ALL_WIDTH + 10,
@@ -100,35 +93,14 @@ tm.define("GameScene", {
         // はずれマークグループ
         this.crossGroup = CanvasElement().addChildTo(backShape);
         // マスのグリッドシステム
-        var squareGrid = GridSystem(SQUARE_ALL_WIDTH, MAX_PER_LINE);
+        this.squareGrid = GridSystem(SQUARE_ALL_WIDTH, MAX_PER_LINE);
         // 爆弾のグリッドシステム
         this.bombGrid = GridSystem(BOMB_ALL_WIDTH, BOMB_PER_LINE);
         // レプリカシップのグリッドシステム
         this.repGrid = GridSystem(SQUARE_ALL_WIDTH, 3);
-        var self = this;
-        // マスを生成
-        (SQUARE_NUM).times(function(i) {
-            // インデックス位置設定
-            var xIndex = i % MAX_PER_LINE;
-            var yIndex = (i / MAX_PER_LINE).floor();
-            // マス作成
-            var square = Square().addChildTo(squareGroup);
-            // 位置設定
-            square.x = squareGrid.span(xIndex) + SQUARE_OFFSET_X;
-            square.y = squareGrid.span(yIndex) + SQUARE_OFFSET_Y;
-            // タッチ時
-            square.onpointingstart = function() {
-                // 残り爆弾を減らす
-                var lost = self.bombs.pop();
-                // タッチ無効に
-                square.setInteractive(false);
-                // ヒット判定
-                self.checkHit(square);
-            };
-        });
         // メッセージ
         this.msgText = TextShape({
-            text: "ROUND 10",
+            text: "FINAL ROUND",
             fillStyle: "lime",
             strokeStyle: "green",
         }).addChildTo(this);
@@ -136,40 +108,44 @@ tm.define("GameScene", {
         this.msgText.y = SCREEN_CENTER_Y;
         // 参照用
         this.backShape = backShape;
-        this.squares = squareGroup.children;
-        this.shipGroup = shipGroup;
-        this.ships = shipGroup.children;
-        this.repshipGroup = repshipGroup;
-        this.repships = repshipGroup.children;
+        this.squares = this.squareGroup.children;
+        this.ships = this.shipGroup.children;
+        this.repships = this.repshipGroup.children;
         this.bombs = this.bombGroup.children;
-        this.squareGrid = squareGrid;
         // 何ゲーム目か
         this.round = 0;
-        // 一旦タッチ不可に
-        this.setSquereEnable(false);
-        // シップ配置
+        // 勝利数
+        this.winCnt = 0;
+        // 画面タッチ可能かどうか
+        this.touchable = false;
+        // 初期化
         this.initGame();
     },
     // 配置初期化
     initGame: function() {
+        this.initSquares();
         this.initShips();
 //        this.setShipVisible(false);
         this.initBombs();
-        this.initRepShip();
+        this.initRepShips();
         this.explosionGroup.removeChildren();
         this.crossGroup.removeChildren();
         this.round++;
-        
+        // ラウンド終了なら
+        if (this.round > ROUND_MAX) {
+            this.showResult(); 
+        }
         var self = this;
         // 流れテキスト
-        this.msgText.text = "ROUND {0}".format(this.round); 
+        var txt = this.round === ROUND_MAX ? "FINAL ROUND" : "ROUND {0}";
+        this.msgText.text = txt.format(this.round); 
         this.msgText.left = SCREEN_WIDTH;
         this.msgText.tweener.clear()
                             .to({x: SCREEN_CENTER_X}, 500, "easeOutCubic")
                             .wait(200)
                             .to({right: 0}, 500, "easeInCubic")
                             .call(function(){
-                                self.setSquereEnable(true);     
+                                self.touchable = true;
                             });
     },
     // シップをランダムに配置
@@ -275,6 +251,35 @@ tm.define("GameScene", {
         // はみ出しや重なりがある場合
         return isBad ? true : false;
     },
+    // マス初期化
+    initSquares: function() {
+        this.squares.clear();
+        var self = this;
+        // マスを生成
+        (SQUARE_NUM).times(function(i) {
+            // インデックス位置設定
+            var xIndex = i % MAX_PER_LINE;
+            var yIndex = (i / MAX_PER_LINE).floor();
+            // マス作成
+            var square = Square().addChildTo(self.squareGroup);
+            // 位置設定
+            square.x = self.squareGrid.span(xIndex) + SQUARE_OFFSET_X;
+            square.y = self.squareGrid.span(yIndex) + SQUARE_OFFSET_Y;
+            // タッチ時
+            square.onpointingstart = function() {
+                self.showResult();
+                if (self.touchable) {
+                    self.touchable = false;
+                    // 残り爆弾を減らす
+                    self.loseBomb();
+                    // タッチ無効に
+                    square.setInteractive(false);
+                    // ヒット判定
+                    self.checkHit(square);
+                }
+            };
+        });
+    },
     // 爆弾配置初期化
     initBombs: function() {
         this.bombs.clear();
@@ -291,8 +296,20 @@ tm.define("GameScene", {
             bomb.y = self.bombGrid.span(yIndex) + BOMB_OFFSET_Y;
         });
     },
+    // 爆弾を減らす
+    loseBomb: function() {
+        var last = this.bombs.last;
+        var explosion = Explosion().addChildTo(this.explosionGroup);
+        explosion.setPosition(last.x, last.y).setSize(BOMB_SIZE, BOMB_SIZE);
+        last.remove();
+        explosion.tweener.clear()
+                         .wait(100)
+                         .call(function(){
+                             explosion.remove();
+                         });
+    },
     // レプリカシップ配置初期化
-    initRepShip: function() {
+    initRepShips: function() {
         this.repships.clear();
         var self = this;
         
@@ -320,17 +337,11 @@ tm.define("GameScene", {
                 // ヒットフラグを立てる
                 var explosion = Explosion().addChildTo(self.explosionGroup);
                 explosion.setPosition(square.x, square.y);
+                // 効果音再生
                 tm.asset.Manager.get("se_hit").clone().play();
                 part.isHit = true;
                 hit = true;
-                // 画面をシェイクする
-                var shakeW = SQUARE_SIZE / 10;
-                self.backShape.tweener.clear()
-                                      .by({x: -shakeW}, 100)
-                                      .by({x: shakeW}, 50)
-                                      .by({x: shakeW}, 50)
-                                      .by({x: -shakeW}, 100);
-                // シップの撃沈チェック
+                 // シップの撃沈チェック
                 (SHIP_ARRAY.length).times(function(index) {
                     self.destroyShip(index);
                 });                
@@ -340,10 +351,13 @@ tm.define("GameScene", {
         if (!hit) {
             var cross = Cross().addChildTo(this.crossGroup);
             cross.setPosition(square.x, square.y);
-        }
-        // 弾切れなら負け
-        if (this.bombs.length === 0) {
-            this.lose();
+            // 弾切れなら負け
+            if (this.bombs.length === 0) {
+                this.lose();
+            }
+            else {
+                this.touchable = true;
+            }
         }
     },
     // 指定されたシップの撃沈チェック
@@ -374,13 +388,24 @@ tm.define("GameScene", {
         });
         // シップ全撃破でクリア
         if (dCnt === CLEAR_CNT) {
-            this.clear();
+            this.win();
+        }
+        else {
+            // 画面をシェイクする
+            var shakeW = SQUARE_SIZE / 8;
+            self.backShape.tweener.clear()
+            　　　　　　　　              .by({x: -shakeW}, 100)
+                                  .by({x: shakeW}, 50)
+                                  .by({x: shakeW}, 50)
+                                  .by({x: -shakeW}, 100)
+                                  .call(function(){
+                                      self.touchable = true;
+                                  });
         }
     },
     // 負け
     lose: function() {
         var self = this;
-        this.setSquereEnable(false);
         // シップ位置表示
         this.setShipVisible(true);
         this.tweener.clear()
@@ -392,14 +417,21 @@ tm.define("GameScene", {
     // 勝ち
     win: function() {
         var self = this;
-        this.setSquereDisable();
+        this.msgText.text = "YOU WIN";
+        this.winCnt++;
         this.msgText.tweener.clear()
                             .wait(200)
                             .to({x: SCREEN_CENTER_X}, 1000, "easeOutBounce")
                             .wait(1000)
                             .call(function(){
-                                self.exit("title"); 
+                                self.initGame(); 
                             });
+    },
+    // 結果表示
+    showResult: function() {
+        this.exit("result", {
+            message: "WIN {0} LOSE {1}".format(self.winCnt, ROUND_MAX - self.winCnt),
+        }); 
     },
     // シップの表示切替え
     setShipVisible: function(b) {
@@ -408,13 +440,106 @@ tm.define("GameScene", {
             part.setAlpha(alpha);
         });
     },
-    // マスのタッチ設定
-    setSquereEnable: function(b) {
-        this.squares.each(function(square) {
-            square.setInteractive(b);
-        });
-    },
 });
+tm.define("ResultScene", {
+        superClass: "Scene",
+
+        init: function(param) {
+            this.superInit();
+
+            this.fromJSON({
+                children: {
+                    bg: {
+                        type: "tm.display.RectangleShape",
+                        init: {
+                            width: SCREEN_WIDTH,
+                            height: SCREEN_HEIGHT,
+                            fillStyle: "silver",
+                            strokeStyle: "silver",
+                        },
+                        originX: 0,
+                        originY: 0,
+                    }
+                }
+            });
+
+            this.fromJSON({
+                children: {
+                    resultText: {
+                        type: "Label",
+                        text: "Result",
+                        x: this._toGridX(6),
+                        y: this._toGridY(4),
+                        fillStyle: "black",
+                        fontSize: 72,
+                        fontFamily: "'Helvetica-Light' 'Meiryo' sans-serif",
+                    },
+                    messageText: {
+                        type: "Label",
+                        text: param.message,
+                        x: this._toGridX(6),
+                        y: this._toGridY(6),
+                        fillStyle: "black",
+                        fontSize: 48,
+                        fontFamily: "'Helvetica-Light' 'Meiryo' sans-serif",
+                    },
+
+                    shareButton: {
+                        type: "FlatButton",
+                        init: {
+                            text: "Share",
+                            width: 200,
+                            fillStyle: "hsl(240, 100%, 64%)",
+                        },
+                        x: this._toGridX(4),
+                        y: this._toGridY(9),
+                    },
+                    backButton: {
+                        type: "FlatButton",
+                        init: {
+                            text: "Back",
+                            width: 200,
+                            fillStyle: "hsl(240, 80%, 0%)",
+                        },
+                        x: this._toGridX(8),
+                        y: this._toGridY(9),
+                    }
+                }
+            });
+
+            // setup tweet
+            var text = param.message;
+            var twitterURL = tm.social.Twitter.createURL({
+                type    : "tweet",
+                text    : text,
+                hashtags: "tmlib,game",
+                url     : param.url, // or window.document.location.href
+            });
+            this.shareButton.onclick = function() {
+                window.open(twitterURL, 'share window', 'width=400, height=300');
+            };
+
+            // setup back
+            this.backButton.onpointingstart = this._back.bind(this);
+            this.autopop = true;
+        },
+
+        _toGridX: function(index) {
+            return SCREEN_WIDTH/12*index;
+        },
+
+        _toGridY: function(index) {
+            return SCREEN_HEIGHT/12*index;
+        },
+
+        _back: function() {
+            this.flare("finish");
+
+            if (this.autopop) {
+                this.app.popScene();
+            }
+        },
+    });
 // マスクラス
 tm.define("Square", {
     // 親クラスを指定
@@ -465,6 +590,8 @@ tm.define("Cross", {
         // 親クラスの初期化
         this.superInit("cross");
         this.setSize(SQUARE_SIZE, SQUARE_SIZE);
+        this.tweener.clear().to({scaleX: 0.8, scaleY: 0.8}, 100)
+                            .to({scaleX: 1.0, scaleY: 1.0}, 100);
     },
 });
 // 爆発クラス
