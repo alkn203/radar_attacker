@@ -1,7 +1,8 @@
-# Radar Attacker
-A BattleShip-like game made in tmlib.js
+# Radar Touch
+よくある海戦ゲーム風の位置当てゲームです。
 
-海戦ゲーム風 tmlib.js製
+# 遊び方
+
 
 本プログラムで使用している画像について
 * 制作者：ハムコロ様
