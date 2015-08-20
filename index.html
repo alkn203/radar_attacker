@@ -60,7 +60,7 @@ var SHIP_ARRAY       = [[[0, 0], [1, 0]],
                         [[0, 0], [1, 0], [2, 0]],
                         [[0, 0], [1, 0], [2, 0], [3, 0]]];
 var CLEAR_CNT        = 9; // クリアに必要なヒット数
-var ROUND_MAX        = 1; // ラウンド数
+var ROUND_MAX        = 5; // ラウンド数
 // ゲームシーン
 tm.define("GameScene", {
     // 親クラスを指定
@@ -267,7 +267,6 @@ tm.define("GameScene", {
             square.y = self.squareGrid.span(yIndex) + SQUARE_OFFSET_Y;
             // タッチ時
             square.onpointingstart = function() {
-                self.showResult();
                 if (self.touchable) {
                     self.touchable = false;
                     // 残り爆弾を減らす
@@ -337,18 +336,31 @@ tm.define("GameScene", {
                 // ヒットフラグを立てる
                 var explosion = Explosion().addChildTo(self.explosionGroup);
                 explosion.setPosition(square.x, square.y);
-                // 効果音再生
-                tm.asset.Manager.get("se_hit").clone().play();
                 part.isHit = true;
                 hit = true;
-                 // シップの撃沈チェック
-                (SHIP_ARRAY.length).times(function(index) {
-                    self.destroyShip(index);
-                });                
             }
         });
-        // 外れならマーク表示
-        if (!hit) {
+        // ヒットしていたら
+        if (hit) {
+            // 効果音再生
+            tm.asset.Manager.get("se_hit").clone().play();
+            // シップの撃沈チェック
+            (SHIP_ARRAY.length).times(function(index) {
+                self.destroyShip(index);
+            });                
+            // 画面をシェイクする
+            var shakeW = SQUARE_SIZE / 8;
+            this.backShape.tweener.clear()
+              　　　　　　              .by({x: -shakeW}, 100)
+                                  .by({x: shakeW}, 50)
+                                  .by({x: shakeW}, 50)
+                                  .by({x: -shakeW}, 100)
+                                  .call(function() {
+                                      self.afterShake();
+                                  });
+        }
+        else {
+            // 外れならマーク表示
             var cross = Cross().addChildTo(this.crossGroup);
             cross.setPosition(square.x, square.y);
             // 弾切れなら負け
@@ -380,27 +392,28 @@ tm.define("GameScene", {
                 }    
             });
         }
+    },
+    // 画面をシェイクした後の処理
+    afterShake: function() {
+        // ヒット数チェック
         var dCnt = 0;
         this.ships.each(function(part) {
             if (part.isHit) {
                 dCnt++;
             }
         });
-        // シップ全撃破でクリア
+        // シップ全撃破で勝ち
         if (dCnt === CLEAR_CNT) {
             this.win();
         }
         else {
-            // 画面をシェイクする
-            var shakeW = SQUARE_SIZE / 8;
-            self.backShape.tweener.clear()
-            　　　　　　　　              .by({x: -shakeW}, 100)
-                                  .by({x: shakeW}, 50)
-                                  .by({x: shakeW}, 50)
-                                  .by({x: -shakeW}, 100)
-                                  .call(function(){
-                                      self.touchable = true;
-                                  });
+            // 弾切れ
+            if (this.bombs.length === 0) {
+                this.lose();
+            }
+            else {
+                this.touchable = true;
+            }
         }
     },
     // 負け
@@ -419,6 +432,7 @@ tm.define("GameScene", {
         var self = this;
         this.msgText.text = "YOU WIN";
         this.winCnt++;
+        console.log(this.winCnt);
         this.msgText.tweener.clear()
                             .wait(200)
                             .to({x: SCREEN_CENTER_X}, 1000, "easeOutBounce")
@@ -430,7 +444,7 @@ tm.define("GameScene", {
     // 結果表示
     showResult: function() {
         this.exit("result", {
-            message: "WIN {0} LOSE {1}".format(self.winCnt, ROUND_MAX - self.winCnt),
+            message: "WIN {0} LOSE {1}".format(this.winCnt, ROUND_MAX - this.winCnt),
         }); 
     },
     // シップの表示切替え
