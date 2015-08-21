@@ -29,6 +29,10 @@ var ASSETS = {
     "cross" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/cross.png",
     "explosion" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/explosion.png",
     "se_hit" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/se_hit.mp3",
+    "se_nothit" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/se_nothit.mp3",
+    "se_explosion" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/se_explosion.mp3",
+    "se_roundstart" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/se_roundstart.mp3",
+    "se_result" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/se_result.mp3",
 };
 // タイトルシーンのデフォルトパラメータ書き換え
 tm.game.TitleScene.default.bgImage = "bg_title";
@@ -172,21 +176,27 @@ tm.define("GameScene", {
         this.round++;
         // ラウンド終了なら
         if (this.round > ROUND_MAX) {
+            // 効果音再生
+            tm.asset.Manager.get("se_result").clone().play();
             this.showResult(); 
         }
-        var self = this;
-        // メッセージ
-        var txt = this.round === ROUND_MAX ? "FINAL ROUND" : "ROUND {0}";
-        this.msgText.text = txt.format(this.round); 
-        this.msgText.left = SCREEN_WIDTH;
-        // アニメーション
-        this.msgText.tweener.clear()
-                            .to({x: SCREEN_CENTER_X}, 500, "easeOutCubic")
-                            .wait(200)
-                            .to({right: 0}, 500, "easeInCubic")
-                            .call(function(){
-                                self.touchable = true;
-                            });
+        else {
+            // 効果音再生
+            tm.asset.Manager.get("se_roundstart").clone().play();
+            var self = this;
+            // メッセージ
+            var txt = this.round === ROUND_MAX ? "FINAL ROUND" : "ROUND {0}";
+            this.msgText.text = txt.format(this.round); 
+            this.msgText.left = SCREEN_WIDTH;
+            // アニメーション
+            this.msgText.tweener.clear()
+                                .to({x: SCREEN_CENTER_X}, 500, "easeOutCubic")
+                                .wait(200)
+                                .to({right: 0}, 500, "easeInCubic")
+                                .call(function(){
+                                    self.touchable = true;
+                                });
+        }
     },
     // シップをランダムに配置
     initShips: function() {
@@ -246,6 +256,7 @@ tm.define("GameScene", {
                 var tmpY = elem.y;
                 var ad = tmpX - org.x;
                 var bd = tmpY - org.y;
+            
                 elem.x = - bd + org.x;
                 elem.y = ad + org.y;
                 elem.rotation = rot * 90;
@@ -381,14 +392,10 @@ tm.define("GameScene", {
                 hit = true;
             }
         });
-        // ヒットしていたら
+        // ヒットしたら
         if (hit) {
             // 効果音再生
             tm.asset.Manager.get("se_hit").clone().play();
-            // シップの撃沈チェック
-            (SHIP_ARRAY.length).times(function(index) {
-                self.destroyShip(index);
-            });                
             // 画面をシェイクする
             var shakeW = SQUARE_SIZE / 8;
             this.backShape.tweener.clear()
@@ -401,10 +408,40 @@ tm.define("GameScene", {
                                   });
         }
         else {
+            // 効果音再生
+            tm.asset.Manager.get("se_nothit").clone().play();
             // 外れならマーク表示
             var cross = Cross().addChildTo(this.crossGroup);
             cross.setPosition(square.x, square.y);
             // 弾切れなら負け
+            if (this.bombs.length === 0) {
+                this.lose();
+            }
+            else {
+                this.touchable = true;
+            }
+        }
+    },
+    // 画面をシェイクした後の処理
+    afterShake: function() {
+        var self = this;
+        // シップの撃沈チェック
+        (SHIP_ARRAY.length).times(function(index) {
+            self.destroyShip(index);
+        });                
+        // ヒット数チェック
+        var dCnt = 0;
+        this.ships.each(function(part) {
+            if (part.isHit) {
+                dCnt++;
+            }
+        });
+        // シップ全撃破で勝ち
+        if (dCnt === CLEAR_CNT) {
+            this.win();
+        }
+        else {
+            // 弾切れ
             if (this.bombs.length === 0) {
                 this.lose();
             }
@@ -429,32 +466,11 @@ tm.define("GameScene", {
             this.repships.each(function(ship) {
                 if (!ship.isBroken && ship.len === sLen) {
                     ship.isBroken = true;
+                    // 効果音再生
+                    tm.asset.Manager.get("se_explosion").clone().play();
                     Explosion().addChildTo(ship).setScale(1.2);
                 }    
             });
-        }
-    },
-    // 画面をシェイクした後の処理
-    afterShake: function() {
-        // ヒット数チェック
-        var dCnt = 0;
-        this.ships.each(function(part) {
-            if (part.isHit) {
-                dCnt++;
-            }
-        });
-        // シップ全撃破で勝ち
-        if (dCnt === CLEAR_CNT) {
-            this.win();
-        }
-        else {
-            // 弾切れ
-            if (this.bombs.length === 0) {
-                this.lose();
-            }
-            else {
-                this.touchable = true;
-            }
         }
     },
     // 負け
