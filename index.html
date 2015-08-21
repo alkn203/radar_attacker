@@ -6,8 +6,8 @@
         <meta name="viewport" content="width=device-width, user-scalable=no" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
  
-        <title>Radar Attacker</title>
-        <meta name="description" content="tmlib.js 用公式エディタ. 色々と使えますよ♪" />
+        <title>Radar Touch</title>
+        <meta name="description" content="" />
 
         <style>body {
     background-color: rgb(240, 240, 250);
@@ -22,15 +22,15 @@ h1 {
         <script src="http://cdn.rawgit.com/phi-jp/tmlib.js/0.5.0/build/tmlib.js"></script>
 		<script>// アセット
 var ASSETS = {
-    "bg_title" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/bg00.png",
-    "bg" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/bg01.png",
-    "ship" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/ship.png",
-    "bomb" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/bomb.png",
-    "cross" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/cross.png",
-    "explosion" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/explosion.png",
-    "se_hit" : "https://raw.githubusercontent.com/alkn203/radar_attacker/gh-pages/assets/se_hit.mp3",
+    "bg_title" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/bg00.png",
+    "bg" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/bg01.png",
+    "ship" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/ship.png",
+    "bomb" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/bomb.png",
+    "cross" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/cross.png",
+    "explosion" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/explosion.png",
+    "se_hit" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/se_hit.mp3",
 };
-// デフォルトパラメータ書き換え
+// タイトルシーンのデフォルトパラメータ書き換え
 tm.game.TitleScene.default.bgImage = "bg_title";
 tm.game.TitleScene.default.fontColor = "lime";
 // 初期化
@@ -40,19 +40,19 @@ tm.game.setup({
 // 定数
 var MAX_PER_LINE     = 8; // マスの並び最大数
 var SQUARE_NUM       = MAX_PER_LINE * MAX_PER_LINE; // マスの数
-var SQUARE_ALL_WIDTH = SCREEN_GRID_X.span(15);    // マスの全体の幅
+var SQUARE_ALL_WIDTH = SCREEN_GRID_X.span(15); // マスの全体の幅
 var SQUARE_MARGIN    = 0;
-var SQUARE_SIZE      = (SQUARE_ALL_WIDTH - (SQUARE_MARGIN * MAX_PER_LINE)) / MAX_PER_LINE;  // マスのサイズ
-var SQUARE_OFFSET_X  = (SCREEN_WIDTH - SQUARE_ALL_WIDTH) / 2 + (SQUARE_SIZE + SQUARE_MARGIN) / 2;   // マスのオフセットX
-var SQUARE_OFFSET_Y  = (SCREEN_HEIGHT - SQUARE_ALL_WIDTH) / 2 + (SQUARE_SIZE + SQUARE_MARGIN) / 2;  // マスのオフセットY
+var SQUARE_SIZE      = (SQUARE_ALL_WIDTH - (SQUARE_MARGIN * MAX_PER_LINE)) / MAX_PER_LINE; // マスのサイズ
+var SQUARE_OFFSET_X  = (SCREEN_WIDTH - SQUARE_ALL_WIDTH) / 2 + (SQUARE_SIZE + SQUARE_MARGIN) / 2; // マスのオフセットX
+var SQUARE_OFFSET_Y  = (SCREEN_HEIGHT - SQUARE_ALL_WIDTH) / 2 + (SQUARE_SIZE + SQUARE_MARGIN) / 2; // マスのオフセットY
 var SQUARE_FILL      = "transparent"; // マスの塗りつぶし色
 var SQUARE_STROKE    = "silver"; // マスの枠色
 var BOMB_MAX         = 24; // 使える爆弾の数
 var BOMB_PER_LINE    = BOMB_MAX / 2; // 爆弾の並び最大数
 var BOMB_ALL_WIDTH   = SCREEN_GRID_X.span(14);    // 爆弾の全体の幅
 var BOMB_MARGIN      = 4; // 爆弾のマージン
-var BOMB_SIZE        = (BOMB_ALL_WIDTH - (BOMB_MARGIN * BOMB_PER_LINE)) / BOMB_PER_LINE;  // 爆弾のサイズ
-var BOMB_OFFSET_X    = (SCREEN_WIDTH - BOMB_ALL_WIDTH) / 2 + (BOMB_SIZE + BOMB_MARGIN) / 2;   // 爆弾のオフセットX
+var BOMB_SIZE        = (BOMB_ALL_WIDTH - (BOMB_MARGIN * BOMB_PER_LINE)) / BOMB_PER_LINE; // 爆弾のサイズ
+var BOMB_OFFSET_X    = (SCREEN_WIDTH - BOMB_ALL_WIDTH) / 2 + (BOMB_SIZE + BOMB_MARGIN) / 2; // 爆弾のオフセットX
 var BOMB_OFFSET_Y    = SCREEN_GRID_Y.span(1.2); // 爆弾のオフセットY
 var SHIP_PART_SIZE   = SQUARE_SIZE; // シップのパーツのサイズ
 // シップの組み立て情報
@@ -69,49 +69,88 @@ tm.define("GameScene", {
     init: function() {
         // 親クラスの初期化
         this.superInit();
-        // 背景画像
-        var backShape = Sprite("bg").addChildTo(this);
-        backShape.origin.set(0, 0);
-        backShape.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
-        // シップグループ
-        this.shipGroup = CanvasElement().addChildTo(backShape);
-        this.repshipGroup = CanvasElement().addChildTo(backShape);
-        // マスグループ
-        this.squareGroup = CanvasElement().addChildTo(backShape);
-        // フレーム
-        var frame = RoundRectangleShape({
-            width: SQUARE_ALL_WIDTH + 10,
-            height: SQUARE_ALL_WIDTH + 10,
-            fillStyle: SQUARE_FILL,
-            strokeStyle: SQUARE_STROKE,
-            lineWidth: 8,
-        }).addChildTo(backShape).setPosition(SCREEN_CENTER_X, SCREEN_CENTER_Y);
-        // 爆弾グループ
-        this.bombGroup = CanvasElement().addChildTo(backShape);
-        // 爆発グループ
-        this.explosionGroup = CanvasElement().addChildTo(backShape);
-        // はずれマークグループ
-        this.crossGroup = CanvasElement().addChildTo(backShape);
+        // JSON形式から子オブジェクト作成
+        this.fromJSON({
+            children: {
+                // 背景画像
+                backShape: {
+                    type: "Sprite",
+                    init: ["bg"],
+                    originX: 0,
+                    originY: 0,
+                },
+                // メッセージ
+                msgText: {
+                    type: "TextShape",
+                    init: {
+                        text: "FINAL ROUND",
+                        fillStyle: "lime",
+                        strokeStyle: "green",
+                    },
+                    left: SCREEN_WIDTH,
+                    y: SCREEN_CENTER_Y,
+                }
+            }
+        });
+        // 背景画像にオブジェクト追加
+        this.backShape.fromJSON({
+            children: {
+                // シップグループ
+                shipGroup: {
+                    type: "CanvasElement",
+                },
+                // レプリカシップグループ
+                repshipGroup: {
+                    type: "CanvasElement",
+                },
+                // マスグループ
+                squareGroup: {
+                    type: "CanvasElement",
+                },
+                // フレーム
+                frame: {
+                    type: "RoundRectangleShape",
+                    init: {
+                        width: SQUARE_ALL_WIDTH + 10,
+                        height: SQUARE_ALL_WIDTH + 10,
+                        fillStyle: SQUARE_FILL,
+                        strokeStyle: SQUARE_STROKE,
+                        lineWidth: 8,
+                        x: SCREEN_CENTER_X,
+                        y: SCREEN_CENTER_Y,
+                    }
+                },
+                // 爆弾グループ
+                bombGroup: {
+                    type: "CanvasElement",
+                },
+                // 爆発グループ
+                explosionGroup: {
+                    type: "CanvasElement",
+                },
+                // はずれマークグループ
+                crossGroup: {
+                    type: "CanvasElement",
+                },
+            }
+        });
         // マスのグリッドシステム
         this.squareGrid = GridSystem(SQUARE_ALL_WIDTH, MAX_PER_LINE);
         // 爆弾のグリッドシステム
         this.bombGrid = GridSystem(BOMB_ALL_WIDTH, BOMB_PER_LINE);
         // レプリカシップのグリッドシステム
         this.repGrid = GridSystem(SQUARE_ALL_WIDTH, 3);
-        // メッセージ
-        this.msgText = TextShape({
-            text: "FINAL ROUND",
-            fillStyle: "lime",
-            strokeStyle: "green",
-        }).addChildTo(this);
-        this.msgText.left = SCREEN_WIDTH;
-        this.msgText.y = SCREEN_CENTER_Y;
         // 参照用
-        this.backShape = backShape;
+        this.squareGroup = this.backShape.squareGroup;
         this.squares = this.squareGroup.children;
+        this.shipGroup = this.backShape.shipGroup;
         this.ships = this.shipGroup.children;
+        this.repshipGroup = this.backShape.repshipGroup;
         this.repships = this.repshipGroup.children;
+        this.bombGroup = this.backShape.bombGroup;
         this.bombs = this.bombGroup.children;
+        this.explosionGroup = this.backShape.explosionGroup;
+        this.crossGroup = this.backShape.crossGroup;
         // 何ゲーム目か
         this.round = 0;
         // 勝利数
@@ -125,21 +164,22 @@ tm.define("GameScene", {
     initGame: function() {
         this.initSquares();
         this.initShips();
-//        this.setShipVisible(false);
+        this.setShipVisible(false);
         this.initBombs();
         this.initRepShips();
         this.explosionGroup.removeChildren();
-        this.crossGroup.removeChildren();
+        this.backShape.crossGroup.removeChildren();
         this.round++;
         // ラウンド終了なら
         if (this.round > ROUND_MAX) {
             this.showResult(); 
         }
         var self = this;
-        // 流れテキスト
+        // メッセージ
         var txt = this.round === ROUND_MAX ? "FINAL ROUND" : "ROUND {0}";
         this.msgText.text = txt.format(this.round); 
         this.msgText.left = SCREEN_WIDTH;
+        // アニメーション
         this.msgText.tweener.clear()
                             .to({x: SCREEN_CENTER_X}, 500, "easeOutCubic")
                             .wait(200)
@@ -206,7 +246,6 @@ tm.define("GameScene", {
                 var tmpY = elem.y;
                 var ad = tmpX - org.x;
                 var bd = tmpY - org.y;
-            
                 elem.x = - bd + org.x;
                 elem.y = ad + org.y;
                 elem.rotation = rot * 90;
@@ -254,6 +293,7 @@ tm.define("GameScene", {
     // マス初期化
     initSquares: function() {
         this.squares.clear();
+
         var self = this;
         // マスを生成
         (SQUARE_NUM).times(function(i) {
@@ -282,6 +322,7 @@ tm.define("GameScene", {
     // 爆弾配置初期化
     initBombs: function() {
         this.bombs.clear();
+
         var self = this;
         // 残り爆弾を配置
         (BOMB_MAX).times(function(i) {
@@ -419,20 +460,27 @@ tm.define("GameScene", {
     // 負け
     lose: function() {
         var self = this;
+        var counter = CLEAR_CNT;
+        var flow = tm.util.Flow(counter, function () {
+            self.initGame();
+        });
         // シップ位置表示
-        this.setShipVisible(true);
-        this.tweener.clear()
-                    .wait(4000)
-                    .call(function(){
-                        self.initGame(); 
-                    });
+        this.ships.each(function(part) {
+            part.tweener.clear()
+                        .fadeIn(1000)
+                        .to({scaleX: 1.2, scaleY: 1.2}, 500)
+                        .to({scaleX: 1.0, scaleY: 1.0}, 500)
+                        .wait(1000)
+                        .call(function() {
+                            flow.pass();   
+                        });
+        });
     },
     // 勝ち
     win: function() {
         var self = this;
         this.msgText.text = "YOU WIN";
         this.winCnt++;
-        console.log(this.winCnt);
         this.msgText.tweener.clear()
                             .wait(200)
                             .to({x: SCREEN_CENTER_X}, 1000, "easeOutBounce")
@@ -527,7 +575,7 @@ tm.define("ResultScene", {
                 type    : "tweet",
                 text    : text,
                 hashtags: "tmlib,game",
-                url     : param.url, // or window.document.location.href
+                url     : "http://alkn203.github.io/radar_touch/"
             });
             this.shareButton.onclick = function() {
                 window.open(twitterURL, 'share window', 'width=400, height=300');
