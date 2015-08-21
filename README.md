@@ -2,6 +2,8 @@
 #### 概要
 tmlib.jsで作った海戦ゲーム風の位置当てゲームです。
 
+![screen_shot.png](https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/screen_shot.png)
+
 [**[ゲームをプレイする]**](http://alkn203.github.io/radar_touch/)
 
 #### 説明
