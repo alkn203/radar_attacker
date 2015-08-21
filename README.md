@@ -4,7 +4,7 @@ tmlib.jsで作った海戦ゲーム風の位置当てゲームです。
 
 ![screen_shot.png](https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/screen_shot.png)
 
-[プレイ]**](http://alkn203.github.io/radar_touch/)
+[**[プレイ]**](http://alkn203.github.io/radar_touch/)
 
 #### 説明
 * 10×10のマス目のいずれかをタッチして、隠れた宇宙船の位置を当てます。
