@@ -20,7 +20,18 @@ h1 {
 }</style>
 
         <script src="http://cdn.rawgit.com/phi-jp/tmlib.js/0.5.2/build/tmlib.js"></script>
-		<script>// アセット
+		<script>// iphone safariサウンド対応
++function(){
+    var b= false;
+    var func;
+    window.addEventListener('touchstart', func = function (e) {
+        if (b) return false;
+            b =  true;
+            tm.sound.WebAudio.unlock();
+            window.removeEventListener('touchstart', func);
+    });
+}();
+// アセット
 var ASSETS = {
     "bg_title" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/bg00.png",
     "bg" : "https://raw.githubusercontent.com/alkn203/radar_touch/gh-pages/assets/bg01.png",
